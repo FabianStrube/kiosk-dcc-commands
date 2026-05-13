@@ -1,68 +1,68 @@
 # Kiosk DCC Commands
 
-> Open-source pipeline commands for Maya, Houdini, Cinema 4D & Blender  
-> Created by **[Kiosk Library](https://www.kiosk-library.com)**
+**Open-source Python commands for Maya, Houdini, Cinema 4D & Blender.**  
+Built for TDs. Free for everyone.
+
+Made by **[Kiosk Library](https://www.kiosk-library.com)** - the asset management app for 3D artists.
 
 ---
 
-## What is this?
+## What's in here?
 
-These are the Python scripts that power the DCC integrations inside **Kiosk Library** — a 3D asset management app for artists working across Maya, Houdini, Cinema 4D, and Blender.
+The actual Python scripts that run inside Kiosk Library every time an artist sends an asset, material, or light into their DCC. Ripped out of the app, cleaned up, and dropped here for anyone to use.
 
-We're releasing them as a free, standalone reference for the community. Whether you're building your own pipeline tools, writing a studio connector, or just curious how things like Redshift material creation or USD stage importing work in Python — grab what's useful and adapt it.
+Copy a file. Paste it in your DCC's script editor. Done.
 
-Every file is self-contained. No extra dependencies, no app required.
+No dependencies. No boilerplate. No app required.
 
 ---
 
-## Repository Structure
+## Structure
 
 ```
 kiosk-dcc-commands/
 ├── Maya/
-│   ├── Common/         # Import, open, reference, image plane
-│   ├── Lights/         # Area lights & dome lights per renderer
-│   └── Materials/      # PBR material builders per renderer
+│   ├── Common/       import, open, reference, USD stage, image plane
+│   ├── Lights/       area lights + dome lights, one file per renderer
+│   └── Materials/    PBR material builders, one file per renderer
 ├── Houdini/
-│   ├── Common/         # Import, open, USD, reference image
-│   ├── Lights/         # Area lights & dome lights per renderer
-│   └── Materials/      # PBR material builders per renderer
+│   ├── Common/       import, open, USD sublayer/reference, refimage
+│   ├── Lights/       area lights + dome lights, one file per renderer
+│   └── Materials/    PBR material builders, one file per renderer
 ├── Cinema4D/
-│   ├── Common/         # Import, open, XRef
-│   ├── Lights/         # Area lights & dome lights per renderer
-│   └── Materials/      # PBR material builders per renderer
+│   ├── Common/       import, open, XRef
+│   ├── Lights/       area lights + dome lights, one file per renderer
+│   └── Materials/    PBR material builders, one file per renderer
 └── Blender/
-    ├── Common/         # Import, open
-    ├── Lights/         # Area light & HDRI world setup
-    └── Materials/      # Principled BSDF builder
+    ├── Common/       import, open
+    ├── Lights/       area light, HDRI world setup
+    └── Materials/    Principled BSDF builder
 ```
 
 ---
 
-## Supported DCCs & Renderers
+## Renderer Support
 
-| | Arnold | Redshift | V-Ray | RenderMan | Octane | Cycles / Karma (MaterialX) |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Maya** | ✓ | ✓ | ✓ | ✓ | — | — |
-| **Houdini** | ✓ | ✓ | — | ✓ | — | ✓ |
-| **Cinema 4D** | — | ✓ | — | — | ✓ | — |
-| **Blender** | — | — | — | — | — | ✓ |
+|              | Arnold | Redshift | V-Ray | RenderMan | Octane | Karma / Cycles |
+|:-------------|:------:|:--------:|:-----:|:---------:|:------:|:--------------:|
+| **Maya**     |   ✓    |    ✓     |   ✓   |     ✓     |        |                |
+| **Houdini**  |   ✓    |    ✓     |       |     ✓     |        |       ✓        |
+| **Cinema 4D**|        |    ✓     |       |           |   ✓    |                |
+| **Blender**  |        |          |       |           |        |       ✓        |
 
 ---
 
 ## How to Use
 
-Each script is self-contained — copy it into your pipeline or paste it directly into the DCC's Python console.
+Every file has an `EXAMPLE` dict at the top with paths you can swap out. Call the function directly.
 
-Every file has an **EXAMPLE dict** at the top that shows the expected inputs. Swap the paths for your own files and call the function.
-
-**Asset import example (Maya):**
+**Import an asset into Maya:**
 ```python
 from Import_Asset import import_asset
 import_asset("/path/to/asset.fbx")
 ```
 
-**PBR material example (Redshift in Maya):**
+**Build a Redshift material in Maya:**
 ```python
 from Redshift_OpenPBR import create_redshift_openpbr
 
@@ -75,28 +75,19 @@ create_redshift_openpbr("ArchPillar_Mat", {
 })
 ```
 
-**ARM-packed texture (single map for AO / Roughness / Metal):**
-```python
-create_redshift_openpbr("ArchPillar_Mat", {
-    "base_color": "/path/to/BaseColor.png",
-    "arm_packed": "/path/to/ARM.png",   # R=AO  G=Roughness  B=Metalness
-    "normal":     "/path/to/Normal.png",
-})
-```
-
-**Houdini — context matters:**  
-Scripts detect whether you are in an OBJ, SOP, or LOP (Solaris/USD) network and create the correct node type. Check the header comment of each Houdini file for the context it targets.
+**Houdini: context matters**  
+Scripts detect whether you are in an OBJ, SOP, or LOP (Solaris/USD) network and create the right node type. Each Houdini file has a note at the top about which context it targets.
 
 ---
 
 ## About Kiosk Library
 
-**Kiosk Library** is a 3D asset management app designed for 3D artists who work across multiple DCCs. It lets you browse, organize, and instantly send assets — models, textures, HDRIs, and materials — directly into your active scene.
+Kiosk Library is an asset management app for 3D artists. Browse your library, click an asset, and it lands in your scene - textures connected, material built, light ready to render.
 
-→ **[www.kiosk-library.com](https://www.kiosk-library.com)**
+**[www.kiosk-library.com](https://www.kiosk-library.com)**
 
 ---
 
 ## License
 
-MIT — do whatever you want with it. Attribution appreciated but not required.
+MIT. Take it, use it, change it.
