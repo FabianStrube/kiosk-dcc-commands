@@ -16,8 +16,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -25,7 +23,6 @@ EXAMPLE = {
 # -------------------------------------------------------------------------------
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 # OpenPBR identifier -> PxrSurface input name.
 # List values connect the same texture to multiple inputs.
@@ -49,12 +46,7 @@ IDENTIFIER_MAP = {
 
 
 def create_renderman_pxrsurface(material_name, textures):
-    """
-    Builds a RenderMan PxrSurface material and connects all PBR texture channels.
-
-    textures: dict mapping OpenPBR identifier names to file paths.
-              Use 'arm_packed' for a single ARM-packed texture (AO/Roughness/Metal).
-    """
+    """Builds a RenderMan PxrSurface material and connects all PBR texture channels."""
     import maya.cmds as cmds
 
     material = cmds.shadingNode("PxrSurface", asShader=True, n=material_name)
@@ -64,30 +56,7 @@ def create_renderman_pxrsurface(material_name, textures):
     file_nodes = []
     bump_node = None
 
-    # ARM packed map
-    if "arm_packed" in textures:
-        arm_path = textures["arm_packed"]
-        tex = cmds.shadingNode("file", asTexture=True)
-        cmds.setAttr(tex + ".fileTextureName", arm_path, type="string")
-        cmds.setAttr(tex + ".colorSpace", "Raw", type="string")
-        cmds.setAttr(tex + ".ignoreColorSpaceFileRules", 1)
-        file_nodes.append(tex)
-        channel_out = {"R": ".outColorR", "G": ".outColorG", "B": ".outColorB"}
-        for ch, identifier in ARM_CHANNELS.items():
-            pxr_attrs = IDENTIFIER_MAP.get(identifier)
-            if pxr_attrs:
-                if isinstance(pxr_attrs, str):
-                    pxr_attrs = [pxr_attrs]
-                for pxr_attr in pxr_attrs:
-                    try:
-                        cmds.connectAttr(tex + channel_out[ch], material + "." + pxr_attr, force=True)
-                    except RuntimeError:
-                        pass
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
-
         is_color = identifier in COLOR_IDENTIFIERS
         tex = cmds.shadingNode("file", asTexture=True)
         cmds.setAttr(tex + ".fileTextureName", file_path, type="string")

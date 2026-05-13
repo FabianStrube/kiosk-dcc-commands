@@ -16,8 +16,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -27,29 +25,22 @@ EXAMPLE = {
 import os
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "base_metalness", "G": "roughness", "B": "ambient_occlusion"}
 
 
 def create_redshift_openpbr(material_name, textures):
-    """
-    Builds a Redshift OpenPBR material using Cinema 4D's node graph API.
-
-    textures: dict mapping OpenPBR identifier names to file paths.
-              Use 'arm_packed' for a single ARM-packed texture (AO/Roughness/Metal).
-    """
+    """Builds a Redshift OpenPBR material using Cinema 4D's node graph API."""
     import c4d
     import maxon
 
     doc = c4d.documents.GetActiveDocument()
 
-    id_texture     = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.texturesampler")
-    id_openpbr     = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.openpbrmaterial")
-    id_standard    = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.standardmaterial")
-    id_bump        = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.bumpmap")
-    id_bump_blend  = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.bumpblender")
+    id_texture      = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.texturesampler")
+    id_openpbr      = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.openpbrmaterial")
+    id_standard     = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.standardmaterial")
+    id_bump         = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.bumpmap")
+    id_bump_blend   = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.bumpblender")
     id_displacement = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.displacement")
-    id_splitter    = maxon.Id("com.redshift3d.redshift4c4d.nodes.core.rscolorsplitter")
-    rs_node_space  = maxon.Id("com.redshift3d.redshift4c4d.class.nodespace")
+    rs_node_space   = maxon.Id("com.redshift3d.redshift4c4d.class.nodespace")
 
     material = c4d.BaseMaterial(c4d.Mmaterial)
     material.SetName(material_name)
@@ -74,7 +65,6 @@ def create_redshift_openpbr(material_name, textures):
 
     bump_ref = None
     normal_ref = None
-    connected_ids = set()
 
     with graph.BeginTransaction() as transaction:
 
@@ -93,11 +83,7 @@ def create_redshift_openpbr(material_name, textures):
         if openpbr_out and out_surface:
             openpbr_out.Connect(out_surface, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
 
-        # Pass 1: regular (non-packed) channels
         for identifier, file_path in textures.items():
-            if identifier == "arm_packed":
-                continue
-
             is_color = identifier in COLOR_IDENTIFIERS
             node_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -105,10 +91,9 @@ def create_redshift_openpbr(material_name, textures):
             tex.SetValue(maxon.NODE.BASE.NAME, node_name)
 
             if not is_color:
-                cs_port = tex.GetInputs().FindChild(
+                tex.GetInputs().FindChild(
                     "com.redshift3d.redshift4c4d.nodes.core.texturesampler.tex0"
-                ).FindChild("colorspace")
-                cs_port.SetPortValue("RS_INPUT_COLORSPACE_RAW")
+                ).FindChild("colorspace").SetPortValue("RS_INPUT_COLORSPACE_RAW")
 
             tex.GetInputs().FindChild(
                 "com.redshift3d.redshift4c4d.nodes.core.texturesampler.tex0"
@@ -127,7 +112,6 @@ def create_redshift_openpbr(material_name, textures):
                 n_out = n_node.GetOutputs().FindChild("com.redshift3d.redshift4c4d.nodes.core.bumpmap.out")
                 tex_out.Connect(n_in, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
                 normal_ref = (n_node, n_out)
-                connected_ids.add(identifier)
 
             elif identifier == "bump":
                 b_node = graph.AddChild(maxon.Id(), id_bump)
@@ -135,7 +119,6 @@ def create_redshift_openpbr(material_name, textures):
                 b_out = b_node.GetOutputs().FindChild("com.redshift3d.redshift4c4d.nodes.core.bumpmap.out")
                 tex_out.Connect(b_in, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
                 bump_ref = (b_node, b_out)
-                connected_ids.add(identifier)
 
             elif identifier == "displacement":
                 d_node  = graph.AddChild(maxon.Id(), id_displacement)
@@ -144,7 +127,6 @@ def create_redshift_openpbr(material_name, textures):
                 out_disp = out_node.GetInputs().FindChild("com.redshift3d.redshift4c4d.node.output.displacement")
                 tex_out.Connect(d_in,   modes=maxon.WIRE_MODE.NORMAL, reverse=False)
                 d_out.Connect(out_disp, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
-                connected_ids.add(identifier)
 
             else:
                 mat_in = openpbr.GetInputs().FindChild(
@@ -152,43 +134,6 @@ def create_redshift_openpbr(material_name, textures):
                 )
                 if mat_in and not mat_in.IsNullValue():
                     tex_out.Connect(mat_in, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
-                    connected_ids.add(identifier)
-
-        # Pass 2: ARM packed map
-        if "arm_packed" in textures:
-            arm_path = textures["arm_packed"]
-            node_name = os.path.splitext(os.path.basename(arm_path))[0]
-            tex = graph.AddChild(maxon.Id(), id_texture)
-            tex.SetValue(maxon.NODE.BASE.NAME, node_name)
-            cs_port = tex.GetInputs().FindChild(
-                "com.redshift3d.redshift4c4d.nodes.core.texturesampler.tex0"
-            ).FindChild("colorspace")
-            cs_port.SetPortValue("RS_INPUT_COLORSPACE_RAW")
-            tex.GetInputs().FindChild(
-                "com.redshift3d.redshift4c4d.nodes.core.texturesampler.tex0"
-            ).FindChild("path").SetPortValue(arm_path)
-            tex_out = tex.GetOutputs().FindChild(
-                "com.redshift3d.redshift4c4d.nodes.core.texturesampler.outcolor"
-            )
-            splitter = graph.AddChild(maxon.Id(), id_splitter)
-            splitter_in = splitter.GetInputs().FindChild(
-                "com.redshift3d.redshift4c4d.nodes.core.rscolorsplitter.input"
-            )
-            tex_out.Connect(splitter_in, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
-            channel_port = {
-                "R": "com.redshift3d.redshift4c4d.nodes.core.rscolorsplitter.outr",
-                "G": "com.redshift3d.redshift4c4d.nodes.core.rscolorsplitter.outg",
-                "B": "com.redshift3d.redshift4c4d.nodes.core.rscolorsplitter.outb",
-            }
-            for ch, identifier in ARM_CHANNELS.items():
-                if identifier in connected_ids:
-                    continue
-                ch_out = splitter.GetOutputs().FindChild(channel_port[ch])
-                mat_in = openpbr.GetInputs().FindChild(
-                    f"com.redshift3d.redshift4c4d.nodes.core.openpbrmaterial.{identifier}"
-                )
-                if ch_out and mat_in and not mat_in.IsNullValue():
-                    ch_out.Connect(mat_in, modes=maxon.WIRE_MODE.NORMAL, reverse=False)
 
         # Wire bump/normal to geometry_normal port
         bump_port = openpbr.GetInputs().FindChild(

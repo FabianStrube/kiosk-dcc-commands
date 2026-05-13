@@ -21,8 +21,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -33,7 +31,6 @@ import os
 import re
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 # OpenPBR identifier -> PxrSurface input name (same parameter names as the Maya version)
 IDENTIFIER_MAP = {
@@ -106,28 +103,7 @@ def create_renderman_pxrsurface(material_name, textures):
     manifold = builder.createNode("pxrmanifold2d::3.0", "UVManifold")
     bump_node = None
 
-    # ARM packed map
-    if "arm_packed" in textures:
-        tex = builder.createNode("pxrtexture::3.0")
-        tex.setName(_sanitize(os.path.basename(textures["arm_packed"])), unique_name=True)
-        tex.parm("filename").set(textures["arm_packed"])
-        tex.parm("linearize").set(0)
-        tex.setNamedInput("manifold", manifold, 0)
-        channel_out = {"R": "resultR", "G": "resultG", "B": "resultB"}
-        for ch, identifier in ARM_CHANNELS.items():
-            pxr_inputs = IDENTIFIER_MAP.get(identifier)
-            if pxr_inputs:
-                if isinstance(pxr_inputs, str):
-                    pxr_inputs = [pxr_inputs]
-                for pxr_input in pxr_inputs:
-                    try:
-                        shader.setNamedInput(pxr_input, tex, channel_out[ch])
-                    except hou.InvalidInput:
-                        pass
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
         is_color = identifier in COLOR_IDENTIFIERS
         tex = builder.createNode("pxrtexture::3.0")
         tex.setName(_sanitize(os.path.basename(file_path)), unique_name=True)

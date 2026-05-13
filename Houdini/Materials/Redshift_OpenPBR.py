@@ -21,8 +21,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -33,7 +31,6 @@ import os
 import re
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 
 def create_redshift_openpbr(material_name, textures):
@@ -79,24 +76,7 @@ def create_redshift_openpbr(material_name, textures):
 
     raw_space, srgb_space = _get_ocio_spaces()
 
-    # ARM packed map
-    if "arm_packed" in textures:
-        tex = builder.createNode("redshift::TextureSampler")
-        tex.setName(_sanitize(os.path.basename(textures["arm_packed"])), unique_name=True)
-        tex.parm("tex0").set(textures["arm_packed"])
-        tex.parm("tex0_colorSpace").set(raw_space)
-        splitter = builder.createNode("redshift::RSColorSplitter")
-        splitter.setInput(0, tex)
-        channel_out = {"R": 0, "G": 1, "B": 2}
-        for ch, identifier in ARM_CHANNELS.items():
-            try:
-                shader.setNamedInput(identifier, splitter, channel_out[ch])
-            except hou.InvalidInput:
-                pass
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
         is_color = identifier in COLOR_IDENTIFIERS
         tex = builder.createNode("redshift::TextureSampler")
         tex.setName(_sanitize(os.path.basename(file_path)), unique_name=True)

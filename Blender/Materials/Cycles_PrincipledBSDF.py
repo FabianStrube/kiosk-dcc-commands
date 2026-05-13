@@ -16,8 +16,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -25,7 +23,6 @@ EXAMPLE = {
 # -------------------------------------------------------------------------------
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 # OpenPBR identifier -> Principled BSDF input socket name
 IDENTIFIER_TO_BSDF = {
@@ -56,7 +53,6 @@ def create_principled_bsdf(material_name, textures):
     The material is automatically assigned to any currently selected mesh objects.
 
     textures: dict mapping OpenPBR identifier names to file paths.
-              Use 'arm_packed' for a single ARM-packed texture (AO/Roughness/Metal).
     """
     import bpy
 
@@ -85,29 +81,7 @@ def create_principled_bsdf(material_name, textures):
     bump_node = None
     y = 0
 
-    # ARM packed map
-    if "arm_packed" in textures:
-        tex = nodes.new("ShaderNodeTexImage")
-        tex.location = (400, y)
-        tex.image = bpy.data.images.load(textures["arm_packed"])
-        tex.image.colorspace_settings.name = "Non-Color"
-        links.new(mapping.outputs["Vector"], tex.inputs["Vector"])
-
-        separate = nodes.new("ShaderNodeSeparateColor")
-        separate.location = (700, y)
-        links.new(tex.outputs["Color"], separate.inputs["Color"])
-
-        channel_out = {"R": "Red", "G": "Green", "B": "Blue"}
-        for ch, identifier in ARM_CHANNELS.items():
-            bsdf_input = IDENTIFIER_TO_BSDF.get(identifier)
-            if bsdf_input and bsdf_input in principled.inputs:
-                links.new(separate.outputs[channel_out[ch]], principled.inputs[bsdf_input])
-        y -= 400
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
-
         is_color = identifier in COLOR_IDENTIFIERS
         tex = nodes.new("ShaderNodeTexImage")
         tex.location = (400, y)

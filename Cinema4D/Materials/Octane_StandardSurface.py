@@ -16,8 +16,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -27,7 +25,6 @@ EXAMPLE = {
 import os
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 # OpenPBR identifier -> Octane Standard Surface SHADERLINK attribute ID
 OCTANE_IDENTIFIER_MAP = {
@@ -60,29 +57,19 @@ OCTANE_IDENTIFIER_MAP = {
 
 COLORSPACE_NON_COLOR = 0
 COLORSPACE_SRGB = 1
-CHANNEL_INDEX = {"R": 0, "G": 1, "B": 2}
 
 
 def create_octane_standard_surface(material_name, textures):
-    """
-    Builds an Octane Standard Surface material and connects all PBR texture channels.
-
-    textures: dict mapping OpenPBR identifier names to file paths.
-              Use 'arm_packed' for a single ARM-packed texture (AO/Roughness/Metal).
-    Packed channels use an Octane Channel Picker node to extract individual channels.
-    """
+    """Builds an Octane Standard Surface material and connects all PBR texture channels."""
     import c4d
 
     ID_OCTANE_STANDARD_SURFACE = 1058763
     ID_OCTANE_IMAGE_TEXTURE    = 1029508
-    ID_OCTANE_CHANNEL_PICKER   = 1056190
 
     doc = c4d.documents.GetActiveDocument()
     material = c4d.BaseMaterial(ID_OCTANE_STANDARD_SURFACE)
     material.SetName(material_name)
     doc.InsertMaterial(material)
-
-    connected_ids = set()
 
     def add_image_texture(file_path, is_color=False):
         sha = c4d.BaseShader(ID_OCTANE_IMAGE_TEXTURE)
@@ -93,11 +80,7 @@ def create_octane_standard_surface(material_name, textures):
         material.InsertShader(sha)
         return sha
 
-    # Pass 1: regular (non-packed) channels
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
-
         attr_name = OCTANE_IDENTIFIER_MAP.get(identifier)
         if not attr_name:
             continue
@@ -111,31 +94,6 @@ def create_octane_standard_surface(material_name, textures):
         img = add_image_texture(file_path, is_color=is_color)
         img.SetName(node_name)
         material[octane_attr] = img
-        connected_ids.add(identifier)
-
-    # Pass 2: ARM packed map — channel picker per channel
-    if "arm_packed" in textures:
-        arm_path = textures["arm_packed"]
-        node_name = os.path.splitext(os.path.basename(arm_path))[0]
-        img = add_image_texture(arm_path, is_color=False)
-        img.SetName(node_name)
-
-        for ch, identifier in ARM_CHANNELS.items():
-            if identifier in connected_ids:
-                continue
-            attr_name = OCTANE_IDENTIFIER_MAP.get(identifier)
-            if not attr_name:
-                continue
-            octane_attr = getattr(c4d, attr_name, None)
-            if octane_attr is None:
-                continue
-
-            picker = c4d.BaseShader(ID_OCTANE_CHANNEL_PICKER)
-            picker.SetName(f"{node_name}_{ch}_pick")
-            picker[1200] = img
-            picker[1201] = CHANNEL_INDEX[ch]
-            material.InsertShader(picker)
-            material[octane_attr] = picker
 
     material.Message(c4d.MSG_UPDATE)
     material.Update(True, True)

@@ -22,8 +22,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -34,7 +32,6 @@ import os
 import re
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 
 def create_arnold_openpbr(material_name, textures):
@@ -82,24 +79,7 @@ def _build_obj(material_name, textures, current_context, current_pane):
 
     raw_space, srgb_space = _get_ocio_spaces()
 
-    # ARM packed map
-    if "arm_packed" in textures:
-        tex = builder.createNode("arnold::image")
-        tex.setName(_sanitize(os.path.basename(textures["arm_packed"])), unique_name=True)
-        tex.parm("filename").set(textures["arm_packed"])
-        tex.setNamedInput("uvcoords", uv_transform, 0)
-        hou.hscript(f"opparm {tex.path()} color_family (Utility)")
-        tex.parm("color_space").set(raw_space)
-        channel_out = {"R": 1, "G": 2, "B": 3}
-        for ch, identifier in ARM_CHANNELS.items():
-            try:
-                shader.setNamedInput(identifier, tex, channel_out[ch])
-            except hou.InvalidInput:
-                pass
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
         is_color = identifier in COLOR_IDENTIFIERS
         tex = builder.createNode("arnold::image")
         tex.setName(_sanitize(os.path.basename(file_path)), unique_name=True)
@@ -161,25 +141,7 @@ def _build_lop(material_name, textures, current_context, current_pane):
 
     raw_space, srgb_space = _get_ocio_spaces()
 
-    if "arm_packed" in textures:
-        file_node = builder.createNode("arnold::mtlximage")
-        file_node.parm("filenamecolorspace").set("Raw")
-        file_node.parm("signature").set("color3")
-        file_node.setNamedInput("uvcoords", uv_reader, 0)
-        file_node.setName(_sanitize(os.path.basename(textures["arm_packed"])), unique_name=True)
-        file_node.parm("filename").set(textures["arm_packed"])
-        splitter = builder.createNode("mtlxseparate3c")
-        splitter.setInput(0, file_node)
-        channel_out = {"R": "outr", "G": "outg", "B": "outb"}
-        for ch, identifier in ARM_CHANNELS.items():
-            try:
-                surface.setNamedInput(identifier, splitter, channel_out[ch])
-            except hou.InvalidInput:
-                pass
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
         is_color = identifier in COLOR_IDENTIFIERS
         file_node = builder.createNode("arnold::mtlximage")
         file_node.parm("filenamecolorspace").set(srgb_space if is_color else "Raw")

@@ -22,8 +22,6 @@ EXAMPLE = {
         "normal":       "/path/to/ArchPillar_Normal.png",
         "displacement": "/path/to/ArchPillar_Displacement.exr",  # optional
         "opacity":      "/path/to/ArchPillar_Opacity.png",       # optional
-        # For ARM-packed textures (AO/Roughness/Metal in one file):
-        # "arm_packed": "/path/to/ArchPillar_ARM.png",
     },
 }
 
@@ -34,7 +32,6 @@ import os
 import re
 
 COLOR_IDENTIFIERS = {"base_color", "emission_color", "coat_color", "specular_color", "subsurface_color"}
-ARM_CHANNELS = {"R": "ambient_occlusion", "G": "roughness", "B": "base_metalness"}
 
 
 def create_materialx_openpbr(material_name, textures):
@@ -72,26 +69,7 @@ def create_materialx_openpbr(material_name, textures):
     surface = builder.createNode("mtlxopen_pbr_surface", "mtlxopen_pbr_surface")
     out_surface.setNamedInput("suboutput", surface, "out")
 
-    # ARM packed map
-    if "arm_packed" in textures:
-        file_node = builder.createNode("mtlximage")
-        file_node.parm("filecolorspace").set("Raw")
-        file_node.parm("signature").set("color3")
-        file_node.setNamedInput("texcoord", uv_place, "out")
-        file_node.setName(_sanitize(os.path.basename(textures["arm_packed"])), unique_name=True)
-        file_node.parm("file").set(textures["arm_packed"])
-        splitter = builder.createNode("mtlxseparate3c")
-        splitter.setInput(0, file_node)
-        channel_out = {"R": "outr", "G": "outg", "B": "outb"}
-        for ch, identifier in ARM_CHANNELS.items():
-            try:
-                surface.setNamedInput(identifier, splitter, channel_out[ch])
-            except hou.InvalidInput:
-                pass
-
     for identifier, file_path in textures.items():
-        if identifier == "arm_packed":
-            continue
         is_color = identifier in COLOR_IDENTIFIERS
         file_node = builder.createNode("mtlximage")
         file_node.parm("filecolorspace").set("srgb_tx" if is_color else "Raw")
